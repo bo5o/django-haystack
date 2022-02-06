@@ -668,7 +668,7 @@ class SolrSearchBackend(BaseSearchBackend):
         for _, field_class in fields.items():
             field_data = {
                 "field_name": field_class.index_fieldname,
-                "type": "text_en",
+                "type": field_class.field_type,
                 "indexed": "true",
                 "stored": "true",
                 "multi_valued": "false",

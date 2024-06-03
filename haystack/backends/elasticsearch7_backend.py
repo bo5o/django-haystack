@@ -27,29 +27,6 @@ except ImportError:
     )
 
 
-DEFAULT_FIELD_MAPPING = {
-    "type": "text",
-    "analyzer": "snowball",
-}
-FIELD_MAPPINGS = {
-    "edge_ngram": {
-        "type": "text",
-        "analyzer": "edgengram_analyzer",
-    },
-    "ngram": {
-        "type": "text",
-        "analyzer": "ngram_analyzer",
-    },
-    "date": {"type": "date"},
-    "datetime": {"type": "date"},
-    "location": {"type": "geo_point"},
-    "boolean": {"type": "boolean"},
-    "float": {"type": "float"},
-    "long": {"type": "long"},
-    "integer": {"type": "long"},
-}
-
-
 class Elasticsearch7SearchBackend(ElasticsearchSearchBackend):
     # Settings to add an n-gram & edge n-gram analyzer.
     DEFAULT_SETTINGS = {
@@ -88,6 +65,29 @@ class Elasticsearch7SearchBackend(ElasticsearchSearchBackend):
                 },
             },
         },
+    }
+
+    DEFAULT_FIELD_MAPPING = {
+        "type": "text",
+        "analyzer": "snowball",
+    }
+
+    FIELD_MAPPINGS = {
+        "edge_ngram": {
+            "type": "text",
+            "analyzer": "edgengram_analyzer",
+        },
+        "ngram": {
+            "type": "text",
+            "analyzer": "ngram_analyzer",
+        },
+        "date": {"type": "date"},
+        "datetime": {"type": "date"},
+        "location": {"type": "geo_point"},
+        "boolean": {"type": "boolean"},
+        "float": {"type": "float"},
+        "long": {"type": "long"},
+        "integer": {"type": "long"},
     }
 
     def __init__(self, connection_alias, **connection_options):
@@ -143,21 +143,17 @@ class Elasticsearch7SearchBackend(ElasticsearchSearchBackend):
                 )
                 self.conn.indices.refresh(index=self.index_name)
 
-        except elasticsearch.TransportError as e:
+        except elasticsearch.TransportError:
             if not self.silently_fail:
                 raise
 
             if models is not None:
-                self.log.error(
-                    "Failed to clear Elasticsearch index of models '%s': %s",
+                self.log.exception(
+                    "Failed to clear Elasticsearch index of models '%s'",
                     ",".join(models_to_delete),
-                    e,
-                    exc_info=True,
                 )
             else:
-                self.log.error(
-                    "Failed to clear Elasticsearch index: %s", e, exc_info=True
-                )
+                self.log.exception("Failed to clear Elasticsearch index")
 
     def build_search_kwargs(
         self,
@@ -479,15 +475,13 @@ class Elasticsearch7SearchBackend(ElasticsearchSearchBackend):
             raw_results = self.conn.search(
                 body=mlt_query, index=self.index_name, _source=True, **params
             )
-        except elasticsearch.TransportError as e:
+        except elasticsearch.TransportError:
             if not self.silently_fail:
                 raise
 
-            self.log.error(
-                "Failed to fetch More Like This from Elasticsearch for document '%s': %s",
+            self.log.exception(
+                "Failed to fetch More Like This from Elasticsearch for document '%s'",
                 doc_id,
-                e,
-                exc_info=True,
             )
             raw_results = {}
 
@@ -556,8 +550,8 @@ class Elasticsearch7SearchBackend(ElasticsearchSearchBackend):
         mapping = self._get_common_mapping()
 
         for _, field_class in fields.items():
-            field_mapping = FIELD_MAPPINGS.get(
-                field_class.field_type, DEFAULT_FIELD_MAPPING
+            field_mapping = self.FIELD_MAPPINGS.get(
+                field_class.field_type, self.DEFAULT_FIELD_MAPPING
             ).copy()
             if field_class.boost != 1.0:
                 field_mapping["boost"] = field_class.boost
